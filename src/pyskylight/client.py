@@ -297,6 +297,19 @@ class SkylightClient:
         payload = self._request("POST", f"{API_PREFIX}/frames/{frame_id}/meals/sittings", json=body)
         return parse_one(payload or {}, Sitting)
 
+    def update_sitting(self, frame_id: str | int, sitting_id: str | int, **fields: Any) -> Sitting:
+        """Update a planned meal (PATCH). Verb/shape inferred; confirm against live traffic."""
+        payload = self._request(
+            "PATCH",
+            f"{API_PREFIX}/frames/{frame_id}/meals/sittings/{sitting_id}",
+            json=_compact(fields),
+        )
+        return parse_one(payload or {}, Sitting)
+
+    def delete_sitting(self, frame_id: str | int, sitting_id: str | int) -> None:
+        """Remove a planned meal. Path inferred (REST convention); confirm against live traffic."""
+        self._request("DELETE", f"{API_PREFIX}/frames/{frame_id}/meals/sittings/{sitting_id}")
+
     # -- lists / chores (read + simple writes) -----------------------------
 
     def list_lists(self, frame_id: str | int) -> List[Any]:
