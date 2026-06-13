@@ -9,7 +9,7 @@ app API (`app.ourskylight.com`) that the community has reverse-engineered. It is
 
 ## Features
 
-- Email/password login (legacy Basic-token flow) with on-disk token caching.
+- Email/password login via the app's OAuth2 (PKCE) flow, with token caching + refresh.
 - Typed client for frames, calendar events, categories, lists, chores, and **Meals**
   (recipes + planned "sittings").
 - A JSON-first `skylight` CLI suitable for scripting or driving from an agent.
@@ -74,13 +74,19 @@ The session token is cached at `${XDG_CACHE_HOME:-~/.cache}/pyskylight/token.jso
 
 ## Authentication notes
 
-Login posts to `POST /api/sessions` and stores `user_id` + `token`; subsequent
-requests send `Authorization: Basic base64(user_id:token)`. The client
-re-authenticates automatically when the token expires (HTTP 401).
+Login uses the app's **OAuth2 Authorization-Code + PKCE** flow (`/oauth/authorize` →
+`/auth/session` → `/oauth/token`) and stores the resulting `access_token` /
+`refresh_token`; subsequent requests send `Authorization: Bearer <access_token>`. The
+client refreshes (or re-logs-in) automatically when the token expires.
 
-> **Skylight Plus:** the Meals/Recipes features appear to require an active Skylight
-> Plus subscription. Without it those endpoints return HTTP 403, surfaced as
-> `SkylightPlusRequiredError`.
+> The older `POST /api/sessions` email/password endpoint is version-gated and
+> effectively retired (it returns "This version of Skylight is no longer supported"),
+> which is why this client uses the OAuth flow. Verified against the live API
+> (2026-06).
+
+> **Skylight Plus:** some Meals features may require Skylight Plus. Where an endpoint
+> is forbidden (HTTP 403) it surfaces as `SkylightPlusRequiredError`. (In practice the
+> Meals/Recipes/Sittings endpoints work on a "basic" account.)
 
 ## Development
 

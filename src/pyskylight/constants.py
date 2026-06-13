@@ -17,9 +17,14 @@ API_PREFIX = "/api"
 #: Default per-request timeout (seconds).
 DEFAULT_TIMEOUT = 30.0
 
-#: A desktop-ish user agent. The API does not appear to require a specific one,
-#: but a stable, honest UA is good manners against a Cloudflare-fronted service.
+#: A stable, honest user agent for data (API) requests.
 USER_AGENT = "pyskylight (+https://github.com/joshuaswarren/pyskylight)"
+
+#: The web OAuth login pages are served to browsers; present a browser UA there.
+BROWSER_UA = (
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+    "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+)
 
 # --- Modern OAuth2 (PKCE) constants, for the optional app-equivalent login flow.
 # Reported by kylejfrost/skylight-api-cli; not used by the default legacy login.

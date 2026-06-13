@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlparse
+
 import httpx
 import pytest
 import respx
@@ -21,16 +23,36 @@ BASE = DEFAULT_BASE_URL
 
 
 def make_client() -> SkylightClient:
-    return SkylightClient(Credentials("123", "tok", "active"))
+    return SkylightClient(Credentials("tok"))
 
 
 @respx.mock
 def test_login_classmethod_builds_client():
-    respx.post(f"{BASE}{API_PREFIX}/sessions").mock(
-        return_value=Response(200, json={"data": {"id": "1", "attributes": {"token": "t"}}})
+    holder = {}
+
+    def on_auth(req):
+        holder["s"] = parse_qs(urlparse(str(req.url)).query).get("state", [""])[0]
+        return Response(200, html='<input name="authenticity_token" value="c">')
+
+    respx.get(f"{BASE}/oauth/authorize").mock(side_effect=on_auth)
+    respx.post(f"{BASE}/auth/session").mock(
+        side_effect=lambda req: Response(
+            302, headers={"Location": f"skylight-family://welcome?code=C&state={holder['s']}"}
+        )
+    )
+    respx.post(f"{BASE}/oauth/token").mock(
+        return_value=Response(
+            200,
+            json={
+                "access_token": "AT",
+                "refresh_token": "RT",
+                "expires_in": 7200,
+                "created_at": 1000,
+            },
+        )
     )
     client = SkylightClient.login("a@b.com", "pw")
-    assert client.credentials.user_id == "1"
+    assert client.credentials.access_token == "AT"
     client.close()
 
 
@@ -44,7 +66,7 @@ def test_list_frames_sends_auth_and_parses():
     frames = make_client().list_frames()
     assert frames[0].id == "7"
     assert frames[0].name == "Home"
-    assert route.calls.last.request.headers["Authorization"].startswith("Basic ")
+    assert route.calls.last.request.headers["Authorization"].startswith("Bearer ")
 
 
 @respx.mock
@@ -175,12 +197,15 @@ def test_sittings_list_and_create():
         )
     )
     route = respx.post(f"{BASE}{API_PREFIX}/frames/7/meals/sittings").mock(
-        return_value=Response(201, json={"data": {"id": "2", "attributes": {"date": "2026-06-21"}}})
+        return_value=Response(
+            201, json={"data": [{"id": "2", "attributes": {"instances": ["2026-06-21"]}}]}
+        )
     )
     c = make_client()
     assert c.list_sittings("7", "2026-06-01", "2026-06-30")[0].date == "2026-06-20"
     s = c.create_sitting("7", "2026-06-21", "3", meal_recipe_id="9")
     assert s.id == "2"
+    assert s.date == "2026-06-21"  # parsed from instances list
     import json as _json
 
     body = _json.loads(route.calls.last.request.content)

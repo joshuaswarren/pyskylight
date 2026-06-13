@@ -98,23 +98,22 @@ class TokenCache:
             return None
         if data.get("base_url") != base_url.rstrip("/"):
             return None
-        user_id = data.get("user_id")
-        token = data.get("token")
-        if not user_id or not token:
+        access_token = data.get("access_token")
+        if not access_token:
             return None
         return Credentials(
-            user_id=str(user_id),
-            token=str(token),
-            subscription_status=data.get("subscription_status"),
+            access_token=str(access_token),
+            refresh_token=data.get("refresh_token"),
+            expires_at=data.get("expires_at"),
         )
 
     def save(self, credentials: Credentials, base_url: str) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "base_url": base_url.rstrip("/"),
-            "user_id": credentials.user_id,
-            "token": credentials.token,
-            "subscription_status": credentials.subscription_status,
+            "access_token": credentials.access_token,
+            "refresh_token": credentials.refresh_token,
+            "expires_at": credentials.expires_at,
         }
         # Write then tighten perms to owner-only.
         self.path.write_text(json.dumps(payload), encoding="utf-8")

@@ -59,13 +59,13 @@ def test_settings_from_env(monkeypatch):
 
 def test_token_cache_roundtrip(tmp_path):
     cache = TokenCache(path=tmp_path / "token.json")
-    creds = Credentials("1", "tok", "active")
+    creds = Credentials("AT", refresh_token="RT", expires_at=8200.0)
     cache.save(creds, "https://app.ourskylight.com")
     loaded = cache.load("https://app.ourskylight.com")
     assert loaded is not None
-    assert loaded.user_id == "1"
-    assert loaded.token == "tok"
-    assert loaded.subscription_status == "active"
+    assert loaded.access_token == "AT"
+    assert loaded.refresh_token == "RT"
+    assert loaded.expires_at == 8200.0
     # owner-only perms
     assert oct(cache.path.stat().st_mode & 0o777) == "0o600"
 

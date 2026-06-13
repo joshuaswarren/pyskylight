@@ -117,7 +117,20 @@ class Sitting(Resource):
 
     @property
     def date(self) -> str | None:
+        # A sitting carries its date(s) in ``attributes.instances`` (a list of
+        # ISO date strings); older/other shapes may use a flat ``date`` field.
+        instances = self.attr("instances")
+        if isinstance(instances, list) and instances:
+            return str(instances[0])
         return self.attr("date")
+
+    @property
+    def dates(self) -> list[str]:
+        instances = self.attr("instances")
+        if isinstance(instances, list) and instances:
+            return [str(d) for d in instances]
+        single = self.attr("date")
+        return [str(single)] if single else []
 
     @property
     def meal_category_id(self) -> str | None:

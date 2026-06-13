@@ -9,10 +9,12 @@ re-authenticates automatically if the token has expired.
 from __future__ import annotations
 
 import json
+import time
 from typing import Any, Callable, Optional
 
 import typer
 
+from .auth import refresh
 from .client import SkylightClient
 from .config import Settings, TokenCache
 from .errors import SkylightAuthError, SkylightError
@@ -49,7 +51,15 @@ def _build_client(settings: Settings, credentials_required: bool = True) -> Skyl
     cache = TokenCache()
     creds = cache.load(settings.base_url)
     if creds is not None:
-        return SkylightClient(creds, base_url=settings.base_url)
+        if not creds.is_expired(time.time()):
+            return SkylightClient(creds, base_url=settings.base_url)
+        if creds.refresh_token:
+            try:
+                fresh = refresh(creds.refresh_token, base_url=settings.base_url)
+                cache.save(fresh, settings.base_url)
+                return SkylightClient(fresh, base_url=settings.base_url)
+            except SkylightError:
+                pass  # refresh failed; fall through to a full login if we can
     if settings.email and settings.password:
         client = SkylightClient.login(settings.email, settings.password, base_url=settings.base_url)
         cache.save(client.credentials, settings.base_url)
@@ -104,12 +114,19 @@ def login() -> None:
         typer.echo(json.dumps({"ok": False, "error": str(exc), "type": type(exc).__name__}))
         raise typer.Exit(code=1)
     TokenCache().save(client.credentials, settings.base_url)
+    subscription = None
+    try:
+        attrs = (client.get_user() or {}).get("data", {}).get("attributes", {})
+        subscription = attrs.get("subscription_status")
+    except SkylightError:
+        pass
     _emit(
         {
             "ok": True,
-            "user_id": client.credentials.user_id,
-            "subscription_status": client.credentials.subscription_status,
-            "is_plus": client.credentials.is_plus,
+            "subscription_status": subscription,
+            "is_plus": bool(subscription)
+            and str(subscription).lower() not in ("basic", "free", ""),
+            "expires_at": client.credentials.expires_at,
         }
     )
 

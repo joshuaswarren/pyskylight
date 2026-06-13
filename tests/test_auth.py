@@ -1,87 +1,135 @@
-"""Tests for the login flow and Credentials."""
+"""Tests for the OAuth2 PKCE login flow and Credentials."""
 
 from __future__ import annotations
 
-import base64
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import pytest
 import respx
 from httpx import Response
 
-from pyskylight.auth import Credentials, login
-from pyskylight.constants import API_PREFIX, DEFAULT_BASE_URL
+from pyskylight.auth import Credentials, login, refresh
+from pyskylight.constants import DEFAULT_BASE_URL
 from pyskylight.errors import SkylightAuthError, SkylightError
 
-URL = f"{DEFAULT_BASE_URL}{API_PREFIX}/sessions"
-
-SESSION_OK = {
-    "data": {
-        "id": "12677864",
-        "type": "authenticated_user",
-        "attributes": {"token": "secret-token", "subscription_status": "active"},
-    }
+B = DEFAULT_BASE_URL
+TOKEN_OK = {
+    "access_token": "AT",
+    "refresh_token": "RT",
+    "expires_in": 7200,
+    "created_at": 1000,
+    "token_type": "Bearer",
+    "scope": "everything",
 }
 
 
-def test_credentials_basic_header():
-    creds = Credentials(user_id="42", token="abc")
-    expected = "Basic " + base64.b64encode(b"42:abc").decode()
-    assert creds.basic_auth_header == expected
+def _setup_oauth(
+    *, csrf="csrf123", good_creds=True, wrong_state=False, token_status=200, token_body=None
+):
+    """Wire up the three OAuth endpoints on the active respx router."""
+    holder = {}
+
+    def on_authorize(request):
+        holder["state"] = parse_qs(urlparse(str(request.url)).query).get("state", [""])[0]
+        body = "<form>no token here</form>"
+        if csrf:
+            body = f'<form><input type="hidden" name="authenticity_token" value="{csrf}"></form>'
+        return Response(200, html=body)
+
+    def on_session(request):
+        if not good_creds:
+            return Response(200, html="login failed, try again")  # no redirect -> bad creds
+        state = "WRONG" if wrong_state else holder["state"]
+        return Response(
+            302, headers={"Location": f"skylight-family://welcome?code=AUTHCODE&state={state}"}
+        )
+
+    respx.get(B + "/oauth/authorize").mock(side_effect=on_authorize)
+    respx.post(B + "/auth/session").mock(side_effect=on_session)
+    respx.post(B + "/oauth/token").mock(
+        return_value=Response(token_status, json=token_body if token_body is not None else TOKEN_OK)
+    )
+    return holder
 
 
-@pytest.mark.parametrize(
-    "status,expected",
-    [("active", True), ("plus", True), ("trialing", True), ("none", False), (None, False)],
-)
-def test_is_plus(status, expected):
-    assert Credentials("1", "t", subscription_status=status).is_plus is expected
+def test_credentials_bearer_header():
+    assert Credentials("AT").bearer_header == "Bearer AT"
+
+
+def test_is_expired():
+    assert Credentials("AT", expires_at=1000).is_expired(2000) is True
+    assert Credentials("AT", expires_at=1000).is_expired(500) is False
+    assert Credentials("AT").is_expired(9_999_999) is False  # unknown expiry -> not expired
 
 
 @respx.mock
-def test_login_json_success():
-    route = respx.post(URL).mock(return_value=Response(200, json=SESSION_OK))
+def test_login_success():
+    _setup_oauth()
     creds = login("you@example.com", "pw")
-    assert creds.user_id == "12677864"
-    assert creds.token == "secret-token"
-    assert creds.is_plus is True
-    # First attempt should be the JSON body.
-    sent = route.calls[0].request
-    assert b"password" in sent.content
-    assert sent.headers["content-type"].startswith("application/json")
+    assert creds.access_token == "AT"
+    assert creds.refresh_token == "RT"
+    assert creds.expires_at == 1000 + 7200
 
 
 @respx.mock
-def test_login_bad_credentials_raises_auth_error():
-    respx.post(URL).mock(return_value=Response(401, json={"error": "nope"}))
+def test_login_bad_credentials():
+    _setup_oauth(good_creds=False)
     with pytest.raises(SkylightAuthError):
         login("you@example.com", "wrong")
 
 
 @respx.mock
-def test_login_falls_back_to_form_encoding():
-    respx.post(URL).mock(side_effect=[Response(500, text="boom"), Response(200, json=SESSION_OK)])
-    creds = login("you@example.com", "pw")
-    assert creds.token == "secret-token"
+def test_login_no_csrf():
+    _setup_oauth(csrf="")
+    with pytest.raises(SkylightAuthError):
+        login("you@example.com", "pw")
 
 
 @respx.mock
-def test_login_missing_token_raises():
-    respx.post(URL).mock(return_value=Response(200, json={"data": {"id": "1", "attributes": {}}}))
+def test_login_state_mismatch():
+    _setup_oauth(wrong_state=True)
+    with pytest.raises(SkylightAuthError):
+        login("you@example.com", "pw")
+
+
+@respx.mock
+def test_login_token_exchange_fails():
+    _setup_oauth(token_status=400, token_body={"error": "invalid_grant"})
+    with pytest.raises(SkylightAuthError):
+        login("you@example.com", "pw")
+
+
+@respx.mock
+def test_login_no_access_token():
+    _setup_oauth(token_body={"token_type": "Bearer"})
     with pytest.raises(SkylightAuthError):
         login("you@example.com", "pw")
 
 
 @respx.mock
 def test_login_network_error():
-    respx.post(URL).mock(side_effect=httpx.ConnectError("down"))
+    respx.get(B + "/oauth/authorize").mock(side_effect=httpx.ConnectError("down"))
     with pytest.raises(SkylightError):
         login("you@example.com", "pw")
 
 
 @respx.mock
-def test_login_prefer_form_first():
-    route = respx.post(URL).mock(return_value=Response(200, json=SESSION_OK))
-    login("you@example.com", "pw", prefer_json=False)
-    # First attempt is form-encoded when prefer_json=False.
-    assert b"resettingPassword" in route.calls[0].request.content
+def test_refresh_success():
+    respx.post(B + "/oauth/token").mock(return_value=Response(200, json=TOKEN_OK))
+    creds = refresh("RT")
+    assert creds.access_token == "AT"
+
+
+@respx.mock
+def test_refresh_failure():
+    respx.post(B + "/oauth/token").mock(return_value=Response(401, json={"error": "bad"}))
+    with pytest.raises(SkylightAuthError):
+        refresh("RT")
+
+
+@respx.mock
+def test_refresh_network_error():
+    respx.post(B + "/oauth/token").mock(side_effect=httpx.ConnectError("down"))
+    with pytest.raises(SkylightError):
+        refresh("RT")

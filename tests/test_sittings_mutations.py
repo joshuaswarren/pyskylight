@@ -27,8 +27,8 @@ def test_update_sitting_uses_patch():
 
 @respx.mock
 def test_delete_sitting():
-    route = respx.delete(f"{BASE}{API_PREFIX}/frames/7/meals/sittings/5").mock(
+    route = respx.delete(f"{BASE}{API_PREFIX}/frames/7/meals/sittings/5/instances/2026-06-20").mock(
         return_value=Response(204)
     )
-    assert _client().delete_sitting("7", "5") is None
+    assert _client().delete_sitting("7", "5", "2026-06-20") is None
     assert route.called

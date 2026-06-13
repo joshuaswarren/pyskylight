@@ -90,7 +90,7 @@ class SkylightClient:
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
         url = f"{self.base_url}{path}"
         headers = dict(kwargs.pop("headers", {}) or {})
-        headers.setdefault("Authorization", self.credentials.basic_auth_header)
+        headers.setdefault("Authorization", self.credentials.bearer_header)
         headers.setdefault("Accept", "application/json")
         headers.setdefault("User-Agent", USER_AGENT)
         try:
@@ -295,7 +295,11 @@ class SkylightClient:
             }
         )
         payload = self._request("POST", f"{API_PREFIX}/frames/{frame_id}/meals/sittings", json=body)
-        return parse_one(payload or {}, Sitting)
+        # Planning a meal returns ``{"data": [<sitting>]}`` (a list), not a single object.
+        data = (payload or {}).get("data")
+        if isinstance(data, list):
+            data = data[0] if data else {}
+        return Sitting.from_jsonapi(data or {})
 
     def update_sitting(self, frame_id: str | int, sitting_id: str | int, **fields: Any) -> Sitting:
         """Update a planned meal (PATCH). Verb/shape inferred; confirm against live traffic."""
@@ -306,9 +310,17 @@ class SkylightClient:
         )
         return parse_one(payload or {}, Sitting)
 
-    def delete_sitting(self, frame_id: str | int, sitting_id: str | int) -> None:
-        """Remove a planned meal. Path inferred (REST convention); confirm against live traffic."""
-        self._request("DELETE", f"{API_PREFIX}/frames/{frame_id}/meals/sittings/{sitting_id}")
+    def delete_sitting(self, frame_id: str | int, sitting_id: str | int, date: str) -> None:
+        """Remove a planned meal on a specific date.
+
+        Deletes the instance (``.../meals/sittings/{id}/instances/{date}``) — this is
+        how the app removes a planned meal. Deleting the sitting resource directly
+        (``.../meals/sittings/{id}``) leaves a dangling entry in the plan view.
+        """
+        self._request(
+            "DELETE",
+            f"{API_PREFIX}/frames/{frame_id}/meals/sittings/{sitting_id}/instances/{date}",
+        )
 
     # -- lists / chores (read + simple writes) -----------------------------
 

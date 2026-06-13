@@ -19,7 +19,7 @@ class FakeClient:
     """A stand-in for SkylightClient used by CLI tests."""
 
     def __init__(self, **overrides):
-        self.credentials = Credentials("123", "tok", "active")
+        self.credentials = Credentials(access_token="AT", refresh_token="RT", expires_at=None)
         self._overrides = overrides
         self.calls = []
 
@@ -100,7 +100,7 @@ def test_login_command(monkeypatch):
     assert result.exit_code == 0
     out = json.loads(result.stdout)
     assert out["ok"] is True
-    assert out["user_id"] == "123"
+    assert out["is_plus"] is False  # FakeClient.get_user has no subscription_status
 
 
 def test_login_requires_env():
