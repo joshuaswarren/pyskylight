@@ -700,14 +700,8 @@ class SkylightClient:
     def get_source_calendar(self, frame_id: str | int, calendar_id: str | int) -> Any:
         return self._request("GET", self._frame_path(frame_id, f"/source_calendars/{calendar_id}"))
 
-    def create_source_calendar(self, frame_id: str | int, **attributes: Any) -> Any:
-        # Verified: the web client wraps the create body as {"attributes": {...}}.
-        # (update_source_calendar sends the attributes flat.)
-        return self._request(
-            "POST",
-            self._frame_path(frame_id, "/source_calendars"),
-            json={"attributes": _compact(attributes)},
-        )
+    # Note: there is no manual "create source calendar" endpoint (POST 404s live).
+    # Source calendars are added by linking an account via calendar_authorization_url().
 
     def update_source_calendar(
         self, frame_id: str | int, calendar_id: str | int, **body: Any

@@ -71,7 +71,6 @@ NEW_COMMANDS: List[List[str]] = [
     ["webcal-add", "--sync-url", "webcal://x"],
     ["source-calendars"],
     ["source-calendar", "21"],
-    ["source-calendar-add", "--json", '{"name":"x"}'],
     ["source-calendar-update", "21", "--json", '{"name":"y"}'],
     ["source-calendar-delete", "21"],
     ["source-calendar-default", "21"],

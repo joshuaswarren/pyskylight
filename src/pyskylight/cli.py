@@ -919,17 +919,6 @@ def source_calendar(
     _emit(_run(lambda c: c.get_source_calendar(fid, calendar_id)))
 
 
-@app.command("source-calendar-add")
-def source_calendar_add(
-    json_body: str = typer.Option(..., "--json"),
-    frame: Optional[str] = typer.Option(None, "--frame"),
-) -> None:
-    """Create a source calendar (body verified live; pass --json)."""
-    fid = _frame(frame)
-    body = _json_arg(json_body) or {}
-    _emit(_run(lambda c: c.create_source_calendar(fid, **body)))
-
-
 @app.command("source-calendar-update")
 def source_calendar_update(
     calendar_id: str = typer.Argument(...),
@@ -1638,7 +1627,7 @@ def alarm_add(
     json_body: str = typer.Option(..., "--json"),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
-    """Create an alarm (body verified live; pass --json)."""
+    """Create an alarm on a Buddy device (alarm body is set by the app form; pass --json)."""
     fid = _frame(frame)
     body = _json_arg(json_body) or {}
     _emit(_run(lambda c: c.create_alarm(fid, device_id, **body)))

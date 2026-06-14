@@ -84,7 +84,7 @@ Run `skylight --help`, or `skylight <command> --help` for flags. Every command t
 | **Auth / identity** | `login`, `logout`, `whoami` |
 | **Frames** | `frames`, `frame`, `frame-rename`, `frame-settings`, `frame-hide`, `frame-activation-code` |
 | **Calendar events** | `events`, `events-search`, `countdowns`, `event-invitees`, `event-add`, `event-update`, `event-delete`, `event-notifications`, `event-notifications-update`, `reminder-notification`, `reminder-notification-update` |
-| **Connected calendars** | `calendars`, `calendar-account`, `calendar-account-update`, `calendar-link`, `webcals`, `webcal-add`, `source-calendars`, `source-calendar`, `source-calendar-add`, `source-calendar-update`, `source-calendar-delete`, `source-calendar-default`, `source-calendar-categorize`, `category-categorize` |
+| **Connected calendars** | `calendars`, `calendar-account`, `calendar-account-update`, `calendar-link`, `webcals`, `webcal-add`, `source-calendars`, `source-calendar`, `source-calendar-update`, `source-calendar-delete`, `source-calendar-default`, `source-calendar-categorize`, `category-categorize` |
 | **Meals — recipes** | `recipes`, `recipe`, `create-recipe`, `update-recipe`, `delete-recipe`, `grocery-add`, `meal-categories`, `update-meal-category` |
 | **Meals — plan (sittings)** | `plan`, `plan-show`, `plan-add`, `plan-update`, `plan-remove`, `plan-instances`, `plan-instance-update` |
 | **Chores** | `chores`, `chore-add`, `chore-add-multiple`, `chore-update`, `chore-complete`, `chore-delete` |
@@ -99,11 +99,12 @@ Run `skylight --help`, or `skylight <command> --help` for flags. Every command t
 | **AI Sidekick** | `ai-intents`, `ai-intent`, `ai-intent-create`, `ai-intent-approve`, `ai-intent-retry`, `ai-intent-undo`, `ai-intent-items` |
 | **Reference / misc** | `avatars`, `colors`, `activities`, `month-in-review`, `month-in-reviews`, `weather`, `geolocation`, `share-link` |
 
-> Request shapes were verified against the live web client (2026-06): most updates take
-> typed flags. A few genuinely opaque bodies (alarm create/update, source-calendar
-> create, and extra AI-intent fields) still accept a `--json '{...}'` pass-through.
-> Account-level and billing operations (registration/deletion, subscription purchase)
-> are intentionally **not** exposed.
+> Request shapes were verified against the live web client + live API (2026-06): most
+> updates take typed flags. **Alarms** apply only to Buddy devices and their body is set
+> by the app form, so `alarm-add`/`alarm-update` accept a `--json '{...}'` pass-through.
+> Source calendars have no manual create endpoint — add one by linking an account with
+> `calendar-link`. Account-level and billing operations (registration/deletion,
+> subscription purchase) are intentionally **not** exposed.
 
 ## Configuration
 

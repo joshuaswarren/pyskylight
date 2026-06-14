@@ -98,7 +98,6 @@ def test_full_client_surface_smoke() -> None:
         lambda: c.subscribe_webcal("7", "webcal://x"),
         lambda: c.list_source_calendars("7"),
         lambda: c.get_source_calendar("7", "21"),
-        lambda: c.create_source_calendar("7", name="x"),
         lambda: c.update_source_calendar("7", "21", name="y"),
         lambda: c.delete_source_calendar("7", "21"),
         lambda: c.set_default_source_calendar("7", "21"),
