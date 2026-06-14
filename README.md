@@ -1,7 +1,15 @@
 # pyskylight
 
+![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
+![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
+![status: alpha](https://img.shields.io/badge/status-alpha-orange)
+
 Unofficial Python client and `skylight` CLI for the [Skylight Calendar](https://www.skylightframe.com/)
 / Buddy family of devices.
+
+> Part of a three-repo set: **pyskylight** (client + CLI) ·
+> [`openclaw-skylight`](https://github.com/joshuaswarren/openclaw-skylight) (OpenClaw skill) ·
+> [`plantoeat-skylight-sync`](https://github.com/joshuaswarren/plantoeat-skylight-sync) (meal-plan sync).
 
 Skylight has **no official or public API.** This library talks to the same private
 app API (`app.ourskylight.com`) that the community has reverse-engineered. It is for
