@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 from pyskylight import cli
 from pyskylight.auth import Credentials
 from pyskylight.errors import SkylightAuthError, SkylightPlusRequiredError
-from pyskylight.models import Frame, MealCategory, Recipe, Sitting
+from pyskylight.models import CalendarEvent, Frame, MealCategory, Recipe, Sitting
 
 runner = CliRunner()
 
@@ -77,6 +77,30 @@ class FakeClient:
 
     def list_chores(self, frame_id):
         return [{"id": "1"}]
+
+    def create_calendar_event(self, frame_id, summary, **fields):
+        return CalendarEvent.from_jsonapi({"id": "e1", "attributes": {"summary": summary}})
+
+    def update_calendar_event(self, frame_id, event_id, **fields):
+        return CalendarEvent.from_jsonapi({"id": event_id, "attributes": {"summary": "Updated"}})
+
+    def delete_calendar_event(self, frame_id, event_id):
+        return None
+
+    def update_recipe(self, frame_id, recipe_id, **fields):
+        return Recipe.from_jsonapi({"id": recipe_id, "attributes": {"summary": "Updated"}})
+
+    def add_recipe_to_grocery_list(self, frame_id, recipe_id):
+        return {"added": True}
+
+    def update_sitting(self, frame_id, sitting_id, **fields):
+        return Sitting.from_jsonapi({"id": sitting_id, "attributes": {"date": "2026-06-21"}})
+
+    def delete_sitting(self, frame_id, sitting_id, date):
+        return None
+
+    def add_list_item(self, frame_id, list_id, label, section=None):
+        return {"id": "li1", "label": label}
 
 
 @pytest.fixture
@@ -234,3 +258,44 @@ def test_build_client_no_creds_raises(monkeypatch):
     # No cache, no env creds -> BadParameter inside _build_client.
     result = runner.invoke(cli.app, ["whoami"])
     assert result.exit_code != 0
+
+
+def test_event_add_update_delete(monkeypatch, fake_client):
+    monkeypatch.setenv("SKYLIGHT_FRAME_ID", "7")
+    r = runner.invoke(
+        cli.app,
+        ["event-add", "--summary", "Soccer", "--all-day", "--category-id", "3", "--tz", "UTC"],
+    )
+    assert r.exit_code == 0
+    assert json.loads(r.stdout)["attributes"]["summary"] == "Soccer"
+    r = runner.invoke(cli.app, ["event-update", "e1", "--summary", "Soccer Practice"])
+    assert r.exit_code == 0
+    r = runner.invoke(cli.app, ["event-delete", "e1"])
+    assert r.exit_code == 0
+    assert json.loads(r.stdout)["deleted"] == "e1"
+
+
+def test_update_recipe_and_grocery_add(monkeypatch, fake_client):
+    monkeypatch.setenv("SKYLIGHT_FRAME_ID", "7")
+    r = runner.invoke(cli.app, ["update-recipe", "9", "--summary", "Tacos al Pastor"])
+    assert r.exit_code == 0
+    assert json.loads(r.stdout)["attributes"]["summary"] == "Updated"
+    r = runner.invoke(cli.app, ["grocery-add", "9"])
+    assert r.exit_code == 0
+    assert json.loads(r.stdout)["ok"] is True
+
+
+def test_plan_update_and_remove(monkeypatch, fake_client):
+    monkeypatch.setenv("SKYLIGHT_FRAME_ID", "7")
+    r = runner.invoke(cli.app, ["plan-update", "2", "--recipe-id", "9"])
+    assert r.exit_code == 0
+    r = runner.invoke(cli.app, ["plan-remove", "2", "--date", "2026-06-21"])
+    assert r.exit_code == 0
+    assert json.loads(r.stdout)["removed"] == "2"
+
+
+def test_list_add(monkeypatch, fake_client):
+    monkeypatch.setenv("SKYLIGHT_FRAME_ID", "7")
+    r = runner.invoke(cli.app, ["list-add", "1", "--label", "Milk", "--section", "Dairy"])
+    assert r.exit_code == 0
+    assert json.loads(r.stdout)["ok"] is True

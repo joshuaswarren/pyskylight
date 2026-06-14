@@ -18,10 +18,17 @@ app API (`app.ourskylight.com`) that the community has reverse-engineered. It is
 ## Features
 
 - Email/password login via the app's OAuth2 (PKCE) flow, with token caching + refresh.
-- Typed client for frames, calendar events, categories, lists, chores, and **Meals**
-  (recipes + planned "sittings").
-- A JSON-first `skylight` CLI suitable for scripting or driving from an agent.
+- **Near-complete coverage of the private API** — ~150 client methods / ~145 `skylight`
+  CLI commands spanning frames, calendar (events, search, countdowns, connected/source
+  calendars, webcal subscriptions, Google-link flow), **Meals** (recipes + planned
+  "sittings" + instances), chores, lists & list items, categories/profiles, **rewards**,
+  **photos/messages/albums**, month-in-review, **devices & Buddy alarms**, household
+  members & config, routines, task-box, weather/geolocation, and the AI Sidekick
+  (auto-creation intents). See [Command reference](#command-reference).
+- A JSON-first CLI suitable for scripting or driving from an agent (every command prints JSON).
 - 1Password-friendly: credentials may be `op://` references resolved at runtime.
+- Honest about uncertainty: a handful of write bodies are reverse-engineered and accept a
+  `--json` / `**extra` pass-through so they keep working as the API is confirmed live.
 
 ## Install
 
@@ -66,6 +73,37 @@ with SkylightClient.login("you@example.com", "…") as sky:
         print(recipe.id, recipe.summary)
     sky.create_sitting(frame.id, date="2026-06-20", meal_category_id="42", meal_recipe_id="99")
 ```
+
+## Command reference
+
+Run `skylight --help`, or `skylight <command> --help` for flags. Every command takes
+`--frame` (or uses `SKYLIGHT_FRAME_ID`) where a household is required.
+
+| Area | Commands |
+|---|---|
+| **Auth / identity** | `login`, `logout`, `whoami` |
+| **Frames** | `frames`, `frame`, `frame-rename`, `frame-settings`, `frame-hide`, `frame-activation-code` |
+| **Calendar events** | `events`, `events-search`, `countdowns`, `event-invitees`, `event-add`, `event-update`, `event-delete`, `event-notifications`, `event-notifications-update`, `reminder-notification`, `reminder-notification-update` |
+| **Connected calendars** | `calendars`, `calendar-account`, `calendar-account-update`, `calendar-link`, `webcals`, `webcal-add`, `source-calendars`, `source-calendar`, `source-calendar-add`, `source-calendar-update`, `source-calendar-delete`, `source-calendar-default`, `source-calendar-categorize`, `category-categorize` |
+| **Meals — recipes** | `recipes`, `recipe`, `create-recipe`, `update-recipe`, `delete-recipe`, `grocery-add`, `meal-categories`, `update-meal-category` |
+| **Meals — plan (sittings)** | `plan`, `plan-show`, `plan-add`, `plan-update`, `plan-remove`, `plan-instances`, `plan-instance-update` |
+| **Chores** | `chores`, `chore-add`, `chore-add-multiple`, `chore-update`, `chore-complete`, `chore-delete` |
+| **Lists & items** | `lists`, `list-show`, `list-items`, `list-create`, `list-update`, `list-delete`, `list-add`, `list-item-update`, `list-item-complete`, `list-item-delete`, `list-items-delete`, `list-item-move`, `list-items-section` |
+| **Categories / profiles** | `categories`, `category`, `category-add`, `category-find-or-create`, `category-update`, `category-delete` |
+| **Rewards** | `rewards`, `reward`, `reward-add`, `reward-update`, `reward-delete`, `reward-redeem`, `reward-unredeem`, `reward-points`, `reward-points-set` |
+| **Photos / messages** | `messages`, `message`, `message-delete`, `messages-delete`, `messages-copy`, `message-caption`, `message-likes`, `message-like`, `message-unlike`, `message-comments`, `message-comment-add`, `message-comment-delete`, `photo-upload`, `upload-credentials` |
+| **Albums** | `albums`, `album-add`, `album-update`, `album-delete`, `album-messages`, `album-message-ids`, `album-add-photos`, `album-remove-photos` |
+| **Devices & alarms (Buddy)** | `devices`, `device`, `device-update`, `device-delete`, `device-activation-code`, `device-reset`, `alarms`, `alarm-add`, `alarm-update`, `alarm-delete` |
+| **Household** | `members`, `member-invite`, `member-approve`, `member-remove`, `member-update`, `household-config`, `household-config-update`, `plus-status` |
+| **Routines / task-box** | `routines`, `routine-add`, `routine-update`, `routine-delete`, `routines-reorder`, `task-box`, `task-box-add`, `task-box-update`, `task-box-delete` |
+| **AI Sidekick** | `ai-intents`, `ai-intent`, `ai-intent-create`, `ai-intent-approve`, `ai-intent-retry`, `ai-intent-undo`, `ai-intent-items` |
+| **Reference / misc** | `avatars`, `colors`, `activities`, `month-in-review`, `month-in-reviews`, `weather`, `geolocation`, `share-link` |
+
+> A few write endpoints (source-calendar create/update, device/alarm/member updates,
+> household config, AI prompts) are reverse-engineered with not-yet-confirmed request
+> bodies; those commands take a `--json '{...}'` pass-through and are marked in
+> `skylight <command> --help`. Account-level and billing operations (account
+> registration/deletion, subscription purchase) are intentionally **not** exposed.
 
 ## Configuration
 
