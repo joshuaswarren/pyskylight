@@ -107,8 +107,8 @@ def test_full_client_surface_smoke() -> None:
         lambda: c.recent_invited_emails("7"),
         lambda: c.get_event_notification_settings("7"),
         lambda: c.update_event_notification_settings("7", enabled=True),
-        lambda: c.get_reminder_notification("7"),
-        lambda: c.update_reminder_notification("7", minutes=10),
+        lambda: c.get_reminder_notification(),
+        lambda: c.update_reminder_notification(6),
         lambda: c.set_source_calendar_categorizations("7", "21", [{"a": 1}]),
         lambda: c.set_category_source_calendar_categorizations("7", "2", [{"a": 1}]),
         lambda: c.list_task_box_items("7"),
@@ -202,7 +202,9 @@ def test_full_client_surface_smoke() -> None:
         # Tier 5 AI intents
         lambda: c.list_auto_creation_intents("7"),
         lambda: c.get_auto_creation_intent("7", "i1"),
-        lambda: c.create_auto_creation_intent("7", "recipe", prompt="tacos"),
+        lambda: c.create_auto_creation_intent(
+            "7", text="a week of easy dinners", engine="default", draft_first=True, list_id="1"
+        ),
         lambda: c.approve_auto_creation_intent("7", "i1"),
         lambda: c.retry_auto_creation_intent("7", "i1"),
         lambda: c.undo_auto_creation_intent("7", "i1"),

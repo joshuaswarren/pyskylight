@@ -493,12 +493,19 @@ def category(
 @app.command("update-meal-category")
 def update_meal_category(
     category_id: str = typer.Argument(...),
-    json_body: Optional[str] = typer.Option(None, "--json", help="JSON body of fields to update."),
+    label: Optional[str] = typer.Option(None, "--label"),
+    color: Optional[str] = typer.Option(None, "--color"),
+    enabled: Optional[bool] = typer.Option(None, "--enabled/--disabled"),
+    position: Optional[int] = typer.Option(None, "--position"),
+    json_body: Optional[str] = typer.Option(None, "--json", help="Any extra fields."),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
-    """Update a meal category (body verified live; pass --json)."""
+    """Update a meal category."""
     fid = _frame(frame)
-    body = _json_arg(json_body) or {}
+    body = _fields(label=label, color=color, enabled=enabled, position=position)
+    body.update(_json_arg(json_body) or {})
+    if not body:
+        raise typer.BadParameter("Nothing to update.")
     _emit(_run(lambda c: c.update_meal_category(fid, category_id, **body)))
 
 
@@ -579,13 +586,24 @@ def chore_update(
 def chore_complete(
     chore_id: str = typer.Argument(...),
     instance_date: Optional[str] = typer.Option(None, "--instance-date"),
+    instance_time: Optional[str] = typer.Option(None, "--instance-time"),
+    category_id: Optional[str] = typer.Option(None, "--category-id"),
     status: str = typer.Option("complete", "--status"),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
     """Mark a chore (or recurring instance) complete/incomplete."""
     fid = _frame(frame)
     _emit(
-        _run(lambda c: c.complete_chore(fid, chore_id, instance_date=instance_date, status=status))
+        _run(
+            lambda c: c.complete_chore(
+                fid,
+                chore_id,
+                instance_date=instance_date,
+                instance_time=instance_time,
+                category_id=category_id,
+                status=status,
+            )
+        )
     )
 
 
@@ -915,12 +933,20 @@ def source_calendar_add(
 @app.command("source-calendar-update")
 def source_calendar_update(
     calendar_id: str = typer.Argument(...),
-    json_body: str = typer.Option(..., "--json"),
+    label: Optional[str] = typer.Option(None, "--label"),
+    kind: Optional[str] = typer.Option(None, "--kind"),
+    default_for_new_events: Optional[bool] = typer.Option(
+        None, "--default-for-new-events/--not-default"
+    ),
+    json_body: Optional[str] = typer.Option(None, "--json", help="Any extra attributes."),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
-    """Update a source calendar (pass --json)."""
+    """Update a source calendar."""
     fid = _frame(frame)
-    body = _json_arg(json_body) or {}
+    body = _fields(label=label, kind=kind, default_for_new_events=default_for_new_events)
+    body.update(_json_arg(json_body) or {})
+    if not body:
+        raise typer.BadParameter("Nothing to update.")
     _emit(_run(lambda c: c.update_source_calendar(fid, calendar_id, **body)))
 
 
@@ -977,31 +1003,33 @@ def event_notifications(frame: Optional[str] = typer.Option(None, "--frame")) ->
 
 @app.command("event-notifications-update")
 def event_notifications_update(
-    json_body: str = typer.Option(..., "--json"),
+    on_time: Optional[bool] = typer.Option(None, "--on-time/--no-on-time"),
+    early: Optional[bool] = typer.Option(None, "--early/--no-early"),
+    early_minutes_before: Optional[int] = typer.Option(None, "--early-minutes-before"),
+    json_body: Optional[str] = typer.Option(None, "--json", help="Any extra fields."),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
-    """Update event-notification settings (pass --json)."""
+    """Update event-notification settings."""
     fid = _frame(frame)
-    body = _json_arg(json_body) or {}
+    body = _fields(on_time=on_time, early=early, early_minutes_before=early_minutes_before)
+    body.update(_json_arg(json_body) or {})
+    if not body:
+        raise typer.BadParameter("Nothing to update.")
     _emit(_run(lambda c: c.update_event_notification_settings(fid, **body)))
 
 
 @app.command("reminder-notification")
-def reminder_notification(frame: Optional[str] = typer.Option(None, "--frame")) -> None:
-    """Show reminder-notification config."""
-    fid = _frame(frame)
-    _emit(_run(lambda c: c.get_reminder_notification(fid)))
+def reminder_notification() -> None:
+    """Show the account reminder profile."""
+    _emit(_run(lambda c: c.get_reminder_notification()))
 
 
 @app.command("reminder-notification-update")
 def reminder_notification_update(
-    json_body: str = typer.Option(..., "--json"),
-    frame: Optional[str] = typer.Option(None, "--frame"),
+    interval_weeks: int = typer.Option(..., "--interval-weeks"),
 ) -> None:
-    """Update reminder-notification config (pass --json)."""
-    fid = _frame(frame)
-    body = _json_arg(json_body) or {}
-    _emit(_run(lambda c: c.update_reminder_notification(fid, **body)))
+    """Set the reminder-profile interval (in weeks)."""
+    _emit(_run(lambda c: c.update_reminder_notification(interval_weeks)))
 
 
 @app.command("source-calendar-categorize")
@@ -1529,12 +1557,36 @@ def device(
 @app.command("device-update")
 def device_update(
     device_id: str = typer.Argument(...),
-    json_body: str = typer.Option(..., "--json"),
+    name: Optional[str] = typer.Option(None, "--name"),
+    brightness: Optional[int] = typer.Option(None, "--brightness"),
+    timezone: Optional[str] = typer.Option(None, "--tz"),
+    nightlight: Optional[bool] = typer.Option(None, "--nightlight/--no-nightlight"),
+    nightlight_brightness: Optional[int] = typer.Option(None, "--nightlight-brightness"),
+    slideshow_speed: Optional[int] = typer.Option(None, "--slideshow-speed"),
+    slideshow_style: Optional[str] = typer.Option(None, "--slideshow-style"),
+    sleep_mode: Optional[str] = typer.Option(None, "--sleep-mode"),
+    sleeps_at: Optional[str] = typer.Option(None, "--sleeps-at"),
+    wakes_at: Optional[str] = typer.Option(None, "--wakes-at"),
+    json_body: Optional[str] = typer.Option(None, "--json", help="Any other device fields."),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
-    """Update a device (body verified live; pass --json)."""
+    """Update a device's settings."""
     fid = _frame(frame)
-    body = _json_arg(json_body) or {}
+    body = _fields(
+        name=name,
+        brightness=brightness,
+        timezone=timezone,
+        nightlight=nightlight,
+        nightlight_brightness=nightlight_brightness,
+        slideshow_speed=slideshow_speed,
+        slideshow_style=slideshow_style,
+        sleep_mode=sleep_mode,
+        sleeps_at=sleeps_at,
+        wakes_at=wakes_at,
+    )
+    body.update(_json_arg(json_body) or {})
+    if not body:
+        raise typer.BadParameter("Nothing to update.")
     _emit(_run(lambda c: c.update_device(fid, device_id, **body)))
 
 
@@ -1657,14 +1709,14 @@ def member_remove(
 
 @app.command("member-update")
 def member_update(
-    member_id: str = typer.Argument(...),
-    json_body: str = typer.Option(..., "--json"),
+    category_id: str = typer.Argument(..., help="The profile/category id to edit."),
+    json_body: str = typer.Option(..., "--json", help='Fields, e.g. \'{"name":"Anna"}\'.'),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
-    """Update a family member (body verified live; pass --json)."""
+    """Update a profile's family-member info (PUT categories/{id}/family_member)."""
     fid = _frame(frame)
     body = _json_arg(json_body) or {}
-    _emit(_run(lambda c: c.update_family_member(fid, member_id, **body)))
+    _emit(_run(lambda c: c.update_family_member(fid, category_id, **body)))
 
 
 @app.command("household-config")
@@ -1676,12 +1728,23 @@ def household_config(frame: Optional[str] = typer.Option(None, "--frame")) -> No
 
 @app.command("household-config-update")
 def household_config_update(
-    json_body: str = typer.Option(..., "--json"),
+    disney_profile_pictures: Optional[bool] = typer.Option(
+        None, "--disney-profile-pictures/--no-disney-profile-pictures"
+    ),
+    disney_screensaver: Optional[bool] = typer.Option(
+        None, "--disney-screensaver/--no-disney-screensaver"
+    ),
+    json_body: Optional[str] = typer.Option(None, "--json", help="Any extra config fields."),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
-    """Update household config (pass --json)."""
+    """Update household config."""
     fid = _frame(frame)
-    body = _json_arg(json_body) or {}
+    body = _fields(
+        disney_profile_pictures=disney_profile_pictures, disney_screensaver=disney_screensaver
+    )
+    body.update(_json_arg(json_body) or {})
+    if not body:
+        raise typer.BadParameter("Nothing to update.")
     _emit(_run(lambda c: c.update_household_config(fid, **body)))
 
 
@@ -1788,14 +1851,34 @@ def ai_intent(
 
 @app.command("ai-intent-create")
 def ai_intent_create(
-    intent_type: str = typer.Option(..., "--type", help="list|recipe|event|meal_plan|..."),
-    json_body: Optional[str] = typer.Option(None, "--json", help="Prompt payload."),
+    text: str = typer.Option(..., "--text", help="The prompt / freeform request."),
+    engine: Optional[str] = typer.Option(None, "--engine"),
+    created_via: Optional[str] = typer.Option(None, "--created-via"),
+    draft_first: Optional[bool] = typer.Option(None, "--draft-first/--no-draft-first"),
+    list_id: Optional[str] = typer.Option(None, "--list-id", help="Target list (list intents)."),
+    meal_category_id: Optional[str] = typer.Option(None, "--meal-category-id"),
+    content_url: Optional[str] = typer.Option(None, "--content-url"),
+    json_body: Optional[str] = typer.Option(None, "--json", help="Any extra fields."),
     frame: Optional[str] = typer.Option(None, "--frame"),
 ) -> None:
-    """Create an AI auto-creation intent."""
+    """Create an AI auto-creation intent (Sidekick) from a prompt."""
     fid = _frame(frame)
-    body = _json_arg(json_body) or {}
-    _emit(_run(lambda c: c.create_auto_creation_intent(fid, intent_type, **body)))
+    extra = _json_arg(json_body) or {}
+    _emit(
+        _run(
+            lambda c: c.create_auto_creation_intent(
+                fid,
+                text=text,
+                engine=engine,
+                created_via=created_via,
+                draft_first=draft_first,
+                list_id=list_id,
+                meal_category_id=meal_category_id,
+                content_url=content_url,
+                **extra,
+            )
+        )
+    )
 
 
 @app.command("ai-intent-approve")

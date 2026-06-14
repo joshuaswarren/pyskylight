@@ -448,9 +448,20 @@ class SkylightClient:
         chore_id: str | int,
         *,
         instance_date: Optional[str] = None,
+        instance_time: Optional[str] = None,
+        category_id: Optional[str | int] = None,
         status: str = "complete",
     ) -> Any:
-        body = _compact({"status": status, "instance_date": instance_date})
+        # Verified shape: PUT chores/{id}/completions {status, instance_date, instance_time,
+        # category_id}; chore_id is the series id.
+        body = _compact(
+            {
+                "status": status,
+                "instance_date": instance_date,
+                "instance_time": instance_time,
+                "category_id": category_id,
+            }
+        )
         return self._request(
             "PUT", self._frame_path(frame_id, f"/chores/{chore_id}/completions"), json=body
         )
@@ -689,9 +700,13 @@ class SkylightClient:
     def get_source_calendar(self, frame_id: str | int, calendar_id: str | int) -> Any:
         return self._request("GET", self._frame_path(frame_id, f"/source_calendars/{calendar_id}"))
 
-    def create_source_calendar(self, frame_id: str | int, **body: Any) -> Any:
+    def create_source_calendar(self, frame_id: str | int, **attributes: Any) -> Any:
+        # Verified: the web client wraps the create body as {"attributes": {...}}.
+        # (update_source_calendar sends the attributes flat.)
         return self._request(
-            "POST", self._frame_path(frame_id, "/source_calendars"), json=_compact(body)
+            "POST",
+            self._frame_path(frame_id, "/source_calendars"),
+            json={"attributes": _compact(attributes)},
         )
 
     def update_source_calendar(
@@ -737,12 +752,13 @@ class SkylightClient:
             "PUT", self._frame_path(frame_id, "/event_notification_settings"), json=_compact(body)
         )
 
-    def get_reminder_notification(self, frame_id: str | int) -> Any:
-        return self._request("GET", self._frame_path(frame_id, "/reminder_notification"))
+    def get_reminder_notification(self) -> Any:
+        # Verified: account-level "reminder profile" (not frame-scoped).
+        return self._request("GET", f"{API_PREFIX}/reminder_profile")
 
-    def update_reminder_notification(self, frame_id: str | int, **body: Any) -> Any:
+    def update_reminder_notification(self, interval_weeks: int) -> Any:
         return self._request(
-            "PUT", self._frame_path(frame_id, "/reminder_notification"), json=_compact(body)
+            "PUT", f"{API_PREFIX}/reminder_profile", json={"interval_weeks": interval_weeks}
         )
 
     def set_source_calendar_categorizations(
@@ -771,10 +787,11 @@ class SkylightClient:
         return self._request("GET", self._frame_path(frame_id, "/task_box/items"))
 
     def create_task_box_item(self, frame_id: str | int, title: str, **extra: Any) -> Any:
+        # Verified: the web client posts the item object flat (no task_box_item wrapper).
         return self._request(
             "POST",
             self._frame_path(frame_id, "/task_box/items"),
-            json={"task_box_item": _compact({"title": title, **extra})},
+            json=_compact({"title": title, **extra}),
         )
 
     def update_task_box_item(self, frame_id: str | int, item_id: str | int, **body: Any) -> Any:
@@ -1105,9 +1122,15 @@ class SkylightClient:
     def remove_frame_user(self, frame_id: str | int, user_id: str | int) -> None:
         self._request("DELETE", self._frame_path(frame_id, f"/users/{user_id}"))
 
-    def update_family_member(self, frame_id: str | int, member_id: str | int, **body: Any) -> Any:
+    def update_family_member(
+        self, frame_id: str | int, category_id: str | int, **fields: Any
+    ) -> Any:
+        # Verified: the web client edits a profile's family-member info via the category
+        # sub-resource: PUT categories/{categoryId}/family_member.
         return self._request(
-            "PATCH", self._frame_path(frame_id, f"/family_members/{member_id}"), json=_compact(body)
+            "PUT",
+            self._frame_path(frame_id, f"/categories/{category_id}/family_member"),
+            json=_compact(fields),
         )
 
     def get_household_config(self, frame_id: str | int) -> Any:
@@ -1162,12 +1185,36 @@ class SkylightClient:
         )
 
     def create_auto_creation_intent(
-        self, frame_id: str | int, intent_type: str, **body: Any
+        self,
+        frame_id: str | int,
+        *,
+        text: Optional[str] = None,
+        engine: Optional[str] = None,
+        created_via: Optional[str] = None,
+        draft_first: Optional[bool] = None,
+        list_id: Optional[str | int] = None,
+        meal_category_id: Optional[str | int] = None,
+        content_url: Optional[str] = None,
+        ext: Optional[str] = None,
+        **extra: Any,
     ) -> Any:
+        # Verified: the web client posts {ext, engine, text, created_via, draft_first} plus
+        # a type-specific target (list_id | meal_category_id+content_url | …). No "type" field.
+        body = _compact(
+            {
+                "ext": ext,
+                "engine": engine,
+                "text": text,
+                "created_via": created_via,
+                "draft_first": draft_first,
+                "list_id": list_id,
+                "meal_category_id": meal_category_id,
+                "content_url": content_url,
+                **extra,
+            }
+        )
         return self._request(
-            "POST",
-            self._frame_path(frame_id, "/auto_creation_intents"),
-            json=_compact({"type": intent_type, **body}),
+            "POST", self._frame_path(frame_id, "/auto_creation_intents"), json=body
         )
 
     def approve_auto_creation_intent(self, frame_id: str | int, intent_id: str | int) -> Any:

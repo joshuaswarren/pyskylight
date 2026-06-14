@@ -81,7 +81,7 @@ NEW_COMMANDS: List[List[str]] = [
     ["event-notifications"],
     ["event-notifications-update", "--json", '{"enabled":true}'],
     ["reminder-notification"],
-    ["reminder-notification-update", "--json", '{"minutes":10}'],
+    ["reminder-notification-update", "--interval-weeks", "6"],
     ["source-calendar-categorize", "21", "--json", '[{"a":1}]'],
     ["category-categorize", "2", "--json", '[{"a":1}]'],
     ["task-box"],
@@ -164,7 +164,7 @@ NEW_COMMANDS: List[List[str]] = [
     # Tier 5 AI intents
     ["ai-intents"],
     ["ai-intent", "i1"],
-    ["ai-intent-create", "--type", "recipe", "--json", '{"prompt":"tacos"}'],
+    ["ai-intent-create", "--text", "a week of easy dinners", "--list-id", "1"],
     ["ai-intent-approve", "i1"],
     ["ai-intent-retry", "i1"],
     ["ai-intent-undo", "i1"],

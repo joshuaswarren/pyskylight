@@ -99,11 +99,11 @@ Run `skylight --help`, or `skylight <command> --help` for flags. Every command t
 | **AI Sidekick** | `ai-intents`, `ai-intent`, `ai-intent-create`, `ai-intent-approve`, `ai-intent-retry`, `ai-intent-undo`, `ai-intent-items` |
 | **Reference / misc** | `avatars`, `colors`, `activities`, `month-in-review`, `month-in-reviews`, `weather`, `geolocation`, `share-link` |
 
-> A few write endpoints (source-calendar create/update, device/alarm/member updates,
-> household config, AI prompts) are reverse-engineered with not-yet-confirmed request
-> bodies; those commands take a `--json '{...}'` pass-through and are marked in
-> `skylight <command> --help`. Account-level and billing operations (account
-> registration/deletion, subscription purchase) are intentionally **not** exposed.
+> Request shapes were verified against the live web client (2026-06): most updates take
+> typed flags. A few genuinely opaque bodies (alarm create/update, source-calendar
+> create, and extra AI-intent fields) still accept a `--json '{...}'` pass-through.
+> Account-level and billing operations (registration/deletion, subscription purchase)
+> are intentionally **not** exposed.
 
 ## Configuration
 
