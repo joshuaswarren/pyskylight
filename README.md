@@ -1,5 +1,7 @@
 # pyskylight
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink)](https://github.com/sponsors/joshuaswarren)
+
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
 ![status: alpha](https://img.shields.io/badge/status-alpha-orange)
@@ -157,3 +159,11 @@ and [kylejfrost/skylight-api-cli](https://github.com/kylejfrost/skylight-api-cli
 Unofficial and not affiliated with, endorsed by, or supported by Skylight. The API
 can change without notice. Use only with your own account and data; do not build a
 multi-tenant or commercial service on it. Provided as-is under the [MIT License](LICENSE).
+
+## Support
+
+Every bit of support helps keep pyskylight alive and free. If you are able, [sponsor on GitHub](https://github.com/sponsors/joshuaswarren) or send a Lightning donation to `joshuaswarren@strike.me` to directly fund continued development and new integrations.
+
+[![Sponsor](https://img.shields.io/badge/Sponsor-%E2%9D%A4-pink?style=for-the-badge)](https://github.com/sponsors/joshuaswarren)
+
+If financial support is not an option, you can still make a big difference: [star the repo](https://github.com/joshuaswarren/pyskylight), share it, or recommend it to a colleague. Word of mouth is how most people find pyskylight.
