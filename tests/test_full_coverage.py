@@ -244,11 +244,46 @@ def test_upload_photo_without_presigned_url_raises(tmp_path) -> None:
 def test_upload_photo_failed_put_raises(tmp_path) -> None:
     img = tmp_path / "p.jpg"
     img.write_bytes(b"bytes")
+    signed = "https://up.example/abc?X-Amz-Signature=secret"
     respx.post(f"{BASE}{API}/upload_url").mock(
         return_value=Response(
-            200, json={"data": {"attributes": {"upload_url": "https://up.example/abc"}}}
+            200, json={"data": {"attributes": {"upload_url": signed}}}
         )
     )
-    respx.put("https://up.example/abc").mock(return_value=Response(500, text="boom"))
-    with pytest.raises(SkylightAPIError, match="HTTP 500"):
+    respx.put(url__regex=r"https://up\.example/abc.*").mock(
+        return_value=Response(500, text="boom")
+    )
+    with pytest.raises(SkylightAPIError, match="HTTP 500") as exc_info:
         _client().upload_photo("7", str(img))
+    err = exc_info.value
+    assert err.status_code == 500
+    assert err.body == "boom"
+    msg = str(err)
+    assert "X-Amz-Signature" not in msg
+    assert "secret" not in msg
+    assert "https://up.example/abc" in msg
+
+
+@respx.mock
+def test_upload_photo_failed_put_403_raises(tmp_path) -> None:
+    img = tmp_path / "p.jpg"
+    img.write_bytes(b"bytes")
+    signed = "https://up.example/abc?X-Amz-Signature=secret"
+    respx.post(f"{BASE}{API}/upload_url").mock(
+        return_value=Response(
+            200, json={"data": {"attributes": {"upload_url": signed}}}
+        )
+    )
+    respx.put(url__regex=r"https://up\.example/abc.*").mock(
+        return_value=Response(403, text="AccessDenied")
+    )
+    with pytest.raises(SkylightAPIError) as exc_info:
+        _client().upload_photo("7", str(img))
+    err = exc_info.value
+    assert err.status_code == 403
+    assert err.body == "AccessDenied"
+    msg = str(err)
+    assert "HTTP 403" in msg
+    assert "X-Amz-Signature" not in msg
+    assert "secret" not in msg
+    assert "https://up.example/abc" in msg
