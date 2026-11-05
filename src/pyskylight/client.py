@@ -1051,9 +1051,12 @@ class SkylightClient:
             attrs.get("upload_url") or attrs.get("url") if isinstance(attrs, dict) else None
         )
         if not upload_url:
-            return presign
+            raise SkylightAPIError(
+                "Photo upload failed: presign response did not include an upload URL"
+            )
         with open(file_path, "rb") as fh:
-            self._http.put(upload_url, content=fh.read())
+            put_resp = self._http.put(upload_url, content=fh.read())
+        self._raise_for_status(put_resp, "PUT", upload_url)
         return presign
 
     # -- devices & alarms (Tier 4) ----------------------------------------

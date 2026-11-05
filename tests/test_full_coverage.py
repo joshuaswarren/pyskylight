@@ -8,11 +8,13 @@ error — they do not assert the remote contract (which is verified live).
 
 from __future__ import annotations
 
+import pytest
 import respx
 from httpx import Response
 
 from pyskylight import Credentials, SkylightClient
 from pyskylight.constants import API_PREFIX, DEFAULT_BASE_URL
+from pyskylight.errors import SkylightAPIError
 
 BASE = DEFAULT_BASE_URL
 API = API_PREFIX
@@ -228,11 +230,25 @@ def test_upload_photo_two_step(tmp_path) -> None:
 
 
 @respx.mock
-def test_upload_photo_without_presigned_url_returns_payload(tmp_path) -> None:
+def test_upload_photo_without_presigned_url_raises(tmp_path) -> None:
     img = tmp_path / "p.jpg"
     img.write_bytes(b"bytes")
     respx.post(f"{BASE}{API}/upload_url").mock(
         return_value=Response(200, json={"data": {"attributes": {}}})
     )
-    out = _client().upload_photo("7", str(img))
-    assert out["data"]["attributes"] == {}
+    with pytest.raises(SkylightAPIError, match="upload URL"):
+        _client().upload_photo("7", str(img))
+
+
+@respx.mock
+def test_upload_photo_failed_put_raises(tmp_path) -> None:
+    img = tmp_path / "p.jpg"
+    img.write_bytes(b"bytes")
+    respx.post(f"{BASE}{API}/upload_url").mock(
+        return_value=Response(
+            200, json={"data": {"attributes": {"upload_url": "https://up.example/abc"}}}
+        )
+    )
+    respx.put("https://up.example/abc").mock(return_value=Response(500, text="boom"))
+    with pytest.raises(SkylightAPIError, match="HTTP 500"):
+        _client().upload_photo("7", str(img))
