@@ -12,6 +12,7 @@ adjust once a real request has been captured.
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlsplit
 
@@ -42,6 +43,17 @@ from .models import (
 def _compact(body: Dict[str, Any]) -> Dict[str, Any]:
     """Drop ``None`` values so we only send fields the caller actually set."""
     return {k: v for k, v in body.items() if v is not None}
+
+
+def _storage_error_code(text: Optional[str]) -> Optional[str]:
+    """Return only the ``<Code>`` element of a storage-host XML error body.
+
+    S3-style error bodies echo the provided signature, the string to sign and
+    the access key id back to the caller, so the raw body must never be kept —
+    the short code element (e.g. ``SignatureDoesNotMatch``) is the safe part.
+    """
+    match = re.search(r"<Code>\s*([^<]{1,80}?)\s*</Code>", text or "")
+    return match.group(1) if match else None
 
 
 class SkylightClient:
@@ -1055,19 +1067,32 @@ class SkylightClient:
             raise SkylightAPIError(
                 "Photo upload failed: presign response did not include an upload URL"
             )
-        with open(file_path, "rb") as fh:
-            put_resp = self._http.put(upload_url, content=fh.read())
-        if not put_resp.is_success:
-            # Storage hosts (e.g. S3) are not the Skylight API — never map 401/403
-            # via _raise_for_status. Also redact query (presigned signature) from the
-            # exception message.
-            parts = urlsplit(upload_url)
-            safe_url = f"{parts.scheme}://{parts.netloc}{parts.path}"
-            body = put_resp.text[:500] if put_resp.text else None
+        # Storage hosts (e.g. S3) are not the Skylight API — never map 401/403
+        # via _raise_for_status, never carry a raw error body (it can echo the
+        # provided signature and string-to-sign), and never put the presigned
+        # query in a message: only scheme, host and path are safe.
+        parts = urlsplit(upload_url)
+        safe_url = f"{parts.scheme}://{parts.netloc}{parts.path}"
+        transport_failure = None
+        try:
+            with open(file_path, "rb") as fh:
+                put_resp = self._http.put(upload_url, content=fh.read())
+        except httpx.HTTPError as exc:
+            # The httpx exception carries its request — the full presigned URL —
+            # so neither its text nor the object may survive. Keep only the
+            # class name and raise after the handler so __context__ detaches.
+            transport_failure = type(exc).__name__
+        if transport_failure is not None:
             raise SkylightAPIError(
-                f"PUT {safe_url} failed with HTTP {put_resp.status_code}",
+                f"Network error uploading photo to {safe_url} ({transport_failure})"
+            )
+        if not put_resp.is_success:
+            code = _storage_error_code(put_resp.text)
+            raise SkylightAPIError(
+                f"PUT {safe_url} failed with HTTP {put_resp.status_code}"
+                + (f" ({code})" if code else ""),
                 status_code=put_resp.status_code,
-                body=body,
+                body=code,
             )
         return presign
 

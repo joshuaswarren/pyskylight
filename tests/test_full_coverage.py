@@ -8,6 +8,9 @@ error — they do not assert the remote contract (which is verified live).
 
 from __future__ import annotations
 
+import traceback
+
+import httpx
 import pytest
 import respx
 from httpx import Response
@@ -257,7 +260,7 @@ def test_upload_photo_failed_put_raises(tmp_path) -> None:
         _client().upload_photo("7", str(img))
     err = exc_info.value
     assert err.status_code == 500
-    assert err.body == "boom"
+    assert err.body is None
     msg = str(err)
     assert "X-Amz-Signature" not in msg
     assert "secret" not in msg
@@ -281,9 +284,93 @@ def test_upload_photo_failed_put_403_raises(tmp_path) -> None:
         _client().upload_photo("7", str(img))
     err = exc_info.value
     assert err.status_code == 403
-    assert err.body == "AccessDenied"
+    assert err.body is None
     msg = str(err)
     assert "HTTP 403" in msg
     assert "X-Amz-Signature" not in msg
     assert "secret" not in msg
     assert "https://up.example/abc" in msg
+
+
+@respx.mock
+def test_upload_photo_failed_put_keeps_only_the_storage_error_code(tmp_path) -> None:
+    """An S3 SignatureDoesNotMatch body echoes the signature; keep only <Code>."""
+    img = tmp_path / "p.jpg"
+    img.write_bytes(b"bytes")
+    signed = "https://up.example/abc?X-Amz-Signature=deadbeefsecret&X-Amz-Date=20261120"
+    respx.post(f"{BASE}{API}/upload_url").mock(
+        return_value=Response(
+            200, json={"data": {"attributes": {"upload_url": signed}}}
+        )
+    )
+    s3_body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        "<Error>"
+        "<Code>SignatureDoesNotMatch</Code>"
+        "<Message>The request signature we calculated does not match the "
+        "signature you provided. Check your key and signing method.</Message>"
+        "<AWSAccessKeyId>AKIAIOSFODNN7EXAMPLE</AWSAccessKeyId>"
+        "<StringToSign>AWS4-HMAC-SHA256\n20261120/us-east-1/s3/aws4_request\n"
+        "aabbccdd</StringToSign>"
+        "<SignatureProvided>deadbeefsecret</SignatureProvided>"
+        "<StringToSignBytes>41414141</StringToSignBytes>"
+        "<CanonicalRequest>PUT /abc\nX-Amz-Signature=deadbeefsecret"
+        "</CanonicalRequest>"
+        "<HostId>hostid</HostId><RequestId>reqid</RequestId>"
+        "</Error>"
+    )
+    respx.put(url__regex=r"https://up\.example/abc.*").mock(
+        return_value=Response(403, text=s3_body)
+    )
+    with pytest.raises(SkylightAPIError) as exc_info:
+        _client().upload_photo("7", str(img))
+    err = exc_info.value
+    assert err.status_code == 403
+    assert err.body == "SignatureDoesNotMatch"
+    msg = str(err)
+    assert "SignatureDoesNotMatch" in msg
+    for leaked in (
+        "deadbeefsecret",
+        "AKIAIOSFODNN7EXAMPLE",
+        "StringToSign",
+        "StringToSignBytes",
+        "CanonicalRequest",
+        "aws4_request",
+    ):
+        assert leaked not in (err.body or ""), leaked
+        assert leaked not in msg, leaked
+
+
+@respx.mock
+def test_upload_photo_put_transport_error_raises_api_error(tmp_path) -> None:
+    """A network failure to the storage host still surfaces SkylightAPIError."""
+    img = tmp_path / "p.jpg"
+    img.write_bytes(b"bytes")
+    signed = "https://up.example/abc?X-Amz-Signature=secret"
+    respx.post(f"{BASE}{API}/upload_url").mock(
+        return_value=Response(
+            200, json={"data": {"attributes": {"upload_url": signed}}}
+        )
+    )
+    respx.put(url__regex=r"https://up\.example/abc.*").mock(
+        side_effect=httpx.ConnectError("marker-wAQ9f2e connection refused")
+    )
+    with pytest.raises(SkylightAPIError, match="Network error") as exc_info:
+        _client().upload_photo("7", str(img))
+    err = exc_info.value
+    assert "ConnectError" in str(err)
+    assert "X-Amz-Signature" not in str(err)
+    assert "secret" not in str(err)
+    assert "marker-wAQ9f2e" not in str(err)
+    # The wrapped httpx error carries its request — the full presigned URL —
+    # and its own message text. Neither may appear in the formatted traceback,
+    # and the original error object must not be attached at all.
+    rendered = "".join(
+        traceback.format_exception(type(err), err, err.__traceback__)
+    )
+    assert "X-Amz-Signature" not in rendered
+    assert "secret" not in rendered
+    assert "marker-wAQ9f2e" not in rendered
+    assert "httpx.ConnectError" not in rendered
+    assert err.__cause__ is None
+    assert err.__context__ is None
