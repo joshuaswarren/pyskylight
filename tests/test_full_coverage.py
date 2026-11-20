@@ -8,6 +8,8 @@ error — they do not assert the remote contract (which is verified live).
 
 from __future__ import annotations
 
+import traceback
+
 import httpx
 import pytest
 import respx
@@ -351,10 +353,22 @@ def test_upload_photo_put_transport_error_raises_api_error(tmp_path) -> None:
         )
     )
     respx.put(url__regex=r"https://up\.example/abc.*").mock(
-        side_effect=httpx.ConnectError("[Errno 111] Connection refused")
+        side_effect=httpx.ConnectError("marker-wAQ9f2e connection refused")
     )
     with pytest.raises(SkylightAPIError, match="Network error") as exc_info:
         _client().upload_photo("7", str(img))
-    msg = str(exc_info.value)
-    assert "X-Amz-Signature" not in msg
-    assert "secret" not in msg
+    err = exc_info.value
+    assert "ConnectError" in str(err)
+    assert "X-Amz-Signature" not in str(err)
+    assert "secret" not in str(err)
+    assert "marker-wAQ9f2e" not in str(err)
+    # The wrapped httpx error carries its request — the full presigned URL —
+    # and its own message text. Neither may appear in the formatted traceback.
+    rendered = "".join(
+        traceback.format_exception(type(err), err, err.__traceback__)
+    )
+    assert "X-Amz-Signature" not in rendered
+    assert "secret" not in rendered
+    assert "marker-wAQ9f2e" not in rendered
+    assert "httpx.ConnectError" not in rendered
+    assert err.__cause__ is None

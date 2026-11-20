@@ -1077,10 +1077,13 @@ class SkylightClient:
             with open(file_path, "rb") as fh:
                 put_resp = self._http.put(upload_url, content=fh.read())
         except httpx.HTTPError as exc:
+            # `from None`: the httpx exception carries its request — and with it
+            # the full presigned URL — so neither its text nor the chain may
+            # survive. Only the class name is safe to report.
             raise SkylightAPIError(
-                f"Network error uploading photo to {safe_url}: "
-                f"{str(exc).replace(upload_url, safe_url)}"
-            ) from exc
+                f"Network error uploading photo to {safe_url} "
+                f"({type(exc).__name__})"
+            ) from None
         if not put_resp.is_success:
             code = _storage_error_code(put_resp.text)
             raise SkylightAPIError(
