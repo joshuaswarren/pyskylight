@@ -13,6 +13,7 @@ adjust once a real request has been captured.
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -1051,9 +1052,23 @@ class SkylightClient:
             attrs.get("upload_url") or attrs.get("url") if isinstance(attrs, dict) else None
         )
         if not upload_url:
-            return presign
+            raise SkylightAPIError(
+                "Photo upload failed: presign response did not include an upload URL"
+            )
         with open(file_path, "rb") as fh:
-            self._http.put(upload_url, content=fh.read())
+            put_resp = self._http.put(upload_url, content=fh.read())
+        if not put_resp.is_success:
+            # Storage hosts (e.g. S3) are not the Skylight API — never map 401/403
+            # via _raise_for_status. Also redact query (presigned signature) from the
+            # exception message.
+            parts = urlsplit(upload_url)
+            safe_url = f"{parts.scheme}://{parts.netloc}{parts.path}"
+            body = put_resp.text[:500] if put_resp.text else None
+            raise SkylightAPIError(
+                f"PUT {safe_url} failed with HTTP {put_resp.status_code}",
+                status_code=put_resp.status_code,
+                body=body,
+            )
         return presign
 
     # -- devices & alarms (Tier 4) ----------------------------------------
