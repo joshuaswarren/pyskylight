@@ -363,7 +363,8 @@ def test_upload_photo_put_transport_error_raises_api_error(tmp_path) -> None:
     assert "secret" not in str(err)
     assert "marker-wAQ9f2e" not in str(err)
     # The wrapped httpx error carries its request — the full presigned URL —
-    # and its own message text. Neither may appear in the formatted traceback.
+    # and its own message text. Neither may appear in the formatted traceback,
+    # and the original error object must not be attached at all.
     rendered = "".join(
         traceback.format_exception(type(err), err, err.__traceback__)
     )
@@ -372,3 +373,4 @@ def test_upload_photo_put_transport_error_raises_api_error(tmp_path) -> None:
     assert "marker-wAQ9f2e" not in rendered
     assert "httpx.ConnectError" not in rendered
     assert err.__cause__ is None
+    assert err.__context__ is None

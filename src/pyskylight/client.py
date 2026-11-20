@@ -1073,17 +1073,19 @@ class SkylightClient:
         # query in a message: only scheme, host and path are safe.
         parts = urlsplit(upload_url)
         safe_url = f"{parts.scheme}://{parts.netloc}{parts.path}"
+        transport_failure = None
         try:
             with open(file_path, "rb") as fh:
                 put_resp = self._http.put(upload_url, content=fh.read())
         except httpx.HTTPError as exc:
-            # `from None`: the httpx exception carries its request — and with it
-            # the full presigned URL — so neither its text nor the chain may
-            # survive. Only the class name is safe to report.
+            # The httpx exception carries its request — the full presigned URL —
+            # so neither its text nor the object may survive. Keep only the
+            # class name and raise after the handler so __context__ detaches.
+            transport_failure = type(exc).__name__
+        if transport_failure is not None:
             raise SkylightAPIError(
-                f"Network error uploading photo to {safe_url} "
-                f"({type(exc).__name__})"
-            ) from None
+                f"Network error uploading photo to {safe_url} ({transport_failure})"
+            )
         if not put_resp.is_success:
             code = _storage_error_code(put_resp.text)
             raise SkylightAPIError(
